@@ -8,8 +8,8 @@ Gem::Specification.new do |spec|
   spec.version       = Cinema::VERSION
   spec.authors       = ["Ales Guzik"]
   spec.email         = ["me@aguzik.net"]
-  spec.summary       = %q{TODO: Write a short summary. Required.}
-  spec.description   = %q{TODO: Write a longer description. Optional.}
+  spec.summary       = %q{Select movie from trakt.tv watchlist and stream it from torrents}
+  spec.description   = %q{}
   spec.homepage      = ""
   spec.license       = "MIT"
 
@@ -20,4 +20,6 @@ Gem::Specification.new do |spec|
 
   spec.add_development_dependency "bundler", "~> 1.7"
   spec.add_development_dependency "rake", "~> 10.0"
+  spec.add_dependency "traktr", ">=0.7.0"
+  spec.add_dependency "yify", ">=0.0.1"
 end

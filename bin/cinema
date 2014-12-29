@@ -1,0 +1,4 @@
+#!/usr/bin/env ruby
+require 'cinema'
+
+Cinema.ask_and_play
