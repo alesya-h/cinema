@@ -18,9 +18,13 @@ module Cinema
     def select(title, items, title_proc)
       menu_items = items.each_with_index.map{|x,i| [i.to_s, title_proc.(x)]}
       index = capture_stderr do
-        system 'dialog', '--title', title,
+        success = system 'dialog', '--title', title,
           '--menu', '', '0', '0', '0',
           *menu_items.flatten
+        unless success
+          puts "\nCancelled"
+          exit 0
+        end
       end.to_i
       items[index]
     end
@@ -28,7 +32,7 @@ module Cinema
     def watchlist
       with_unreliable_api do
         puts "Requesting watchlist..."
-        trakt.user.watchlist.movies
+        trakt.user.watchlist.movies.sort_by{|x| x["title"]}
       end
     end
 
