@@ -9,9 +9,12 @@ module Cinema
     def ask_and_play
       imdb_id = select("Select movie", watchlist, ->(x){ x["title"] })["imdb_id"]
       torrent = select("Select quality", torrents(imdb_id), ->(x){ x.quality })["torrent_url"]
-      player = select("Select player", ["mplayer","vlc"], ->(x){x})
-      with_unreliable_api do
-        raise unless system "peerflix", torrent, "--#{player}"
+      downloader = select("Select downloader", ["peerflix","qbittorrent","wget","echo"], ->(x){x})
+      if downloader == 'peerflix'
+        player = select("Select player", ["mplayer","vlc"], ->(x){x})
+        system downloader, torrent, "--#{player}"
+      else
+        system "sh", "-c", "#{downloader} #{torrent} &"
       end
     end
 
