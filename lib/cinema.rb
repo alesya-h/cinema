@@ -1,20 +1,34 @@
-require "cinema/version"
+require 'cinema/version'
+require 'rest_client'
+require 'launchy'
 require 'tempfile'
-require 'traktr'
 require 'yify'
 require 'yaml'
+require 'pry'
 
 module Cinema
   class << self
+    APP_ID="69f18bbaff859f035d934888f846b7ae3653e223a2b0f15629bcc9b836d3996b"
+    APP_SECRET="077edf5024fca4102295263e802631f52f8cebd404f612194279f059bc5d9b8d"
+
     def ask_and_play
-      imdb_id = select("Select movie", watchlist, ->(x){ x["title"] })["imdb_id"]
-      torrent = select("Select quality", torrents(imdb_id), ->(x){ x.quality })["torrent_url"]
-      downloader = select("Select downloader", ["peerflix","qbittorrent","wget","echo"], ->(x){x})
-      if downloader == 'peerflix'
+      imdb_id = select("Select movie",
+                       watchlist.sort_by{|x| x["released"]},
+                       ->(x){ x["movie"]["title"] })["movie"]["ids"]["imdb"]
+      unless imdb_id
+        print "imdb id: "
+        imdb_id = gets.chomp
+      end
+      torrent = select("Select quality", torrents(imdb_id), ->(x){ x["quality"] })["url"]
+      downloader = select("Select downloader", ["peerflix", "qbittorrent", "wget", "echo"], ->(x){x})
+      case downloader
+      when 'peerflix'
         player = select("Select player", ["mplayer","vlc"], ->(x){x})
         system downloader, torrent, "--#{player}"
-      else
+      when 'qbittorrent'
         system "sh", "-c", "#{downloader} #{torrent} &"
+      else
+        system downloader, torrent
       end
     end
 
@@ -25,24 +39,24 @@ module Cinema
           '--menu', '', '0', '0', '0',
           *menu_items.flatten
         unless success
-          puts "\nCancelled"
-          exit 0
+          return nil
         end
-      end.to_i
-      items[index]
+      end
+      items[index.to_i] if index
     end
 
     def watchlist
       with_unreliable_api do
         puts "Requesting watchlist..."
-        trakt.user.watchlist.movies.sort_by{|x| x["title"]}
+        trakt_request(:get, "calendars/my/movies/1900-01-01/1000000")
       end
     end
 
     def torrents(imdb_id)
       with_unreliable_api do
         puts "Searching torrents..."
-        yify.list_imdb(imdb_id: imdb_id).result
+        response = RestClient.get("http://yts.to/api/v2/list_movies.json?query_term=#{imdb_id}").body
+        JSON.parse(response)["data"]["movies"].first["torrents"]
       end
     end
 
@@ -50,17 +64,79 @@ module Cinema
       @yify ||= Yify::Client.new
     end
 
-    def trakt
-      @trakt ||= Traktr::Client.new config['api_key'], config['username'], config['password']
+    def redirect_uri
+      'urn:ietf:wg:oauth:2.0:oob'
+    end
+
+    def pin_to_token(pin)
+      response =
+        RestClient.post('https://trakt.tv/oauth/token', {
+                          code: pin,
+                          client_id: APP_ID,
+                          client_secret: APP_SECRET,
+                          redirect_uri: redirect_uri,
+                          grant_type: 'authorization_code'
+                        }).body
+      JSON.parse(response).values_at('access_token', 'refresh_token')
+    end
+
+    def initial_authorize
+      loop do
+        capture_stderr do
+          Launchy.open("https://trakt.tv/oauth/authorize?client_id=#{APP_ID}&redirect_uri=#{redirect_uri}&response_type=code")
+        end
+        print "Please authorize the app and enter PIN: "
+        pin = gets.chomp
+        if pin.size == 8
+          return pin_to_token(pin)
+        end
+      end
+    end
+
+    def write_config(access_token, refresh_token)
+      File.write config_file, {access_token: access_token, refresh_token: refresh_token}.to_yaml
+    end
+
+    def initial_authorize_and_save_config
+      write_config(*initial_authorize)
+    end
+
+    def refresh_access_token
+      response =
+        RestClient.post('https://trakt.tv/oauth/token', {
+                          refresh_token: config[:refresh_token],
+                          client_id: APP_ID,
+                          client_secret: APP_SECRET,
+                          redirect_uri: redirect_uri,
+                          grant_type: 'refresh_token'
+                        }).body
+      write_config *JSON.parse(response).values_at('access_token', 'refresh_token')
+    end
+
+    def trakt_request(method, path, payload=nil)
+      params = {
+        method: method,
+        url: "https://api-v2launch.trakt.tv/#{path}",
+        payload: payload,
+        headers: {
+          "Content-Type" => "application/json",
+          "Authorization" => "Bearer #{config[:access_token]}",
+          "trakt-api-version" => "2",
+          "trakt-api-key" => APP_ID,
+        }
+      }
+      JSON.parse RestClient::Request.execute(params).body
+    rescue RestClient::Unauthorized
+      puts 'Unauthorized. Trying to refresh token.'
+      refresh_access_token
+      retry
     end
 
     def config
-      @config ||= if File.exist? config_file
-                    YAML.load_file config_file
-                  else
-                    STDERR.puts "#{config_file} not found"
-                    exit 255
-                  end
+      unless File.exist? config_file
+        initial_authorize_and_save_config
+      end
+      YAML.load_file config_file
     end
 
     def config_file
