@@ -1,31 +1,19 @@
 # Cinema
 
-TODO: Write a gem description
+Select movie from trakt.tv watchlist and stream it from torrents
 
 ## Installation
-
-Add this line to your application's Gemfile:
-
-```ruby
-gem 'cinema'
-```
-
-And then execute:
-
-    $ bundle
-
-Or install it yourself as:
 
     $ gem install cinema
 
 ## Usage
 
-TODO: Write usage instructions here
+Run `cinema` command. 
 
-## Contributing
+On first run browser will open. Authorize the app
+and enter PIN code.
 
-1. Fork it ( https://github.com/[my-github-username]/cinema/fork )
-2. Create your feature branch (`git checkout -b my-new-feature`)
-3. Commit your changes (`git commit -am 'Add some feature'`)
-4. Push to the branch (`git push origin my-new-feature`)
-5. Create a new Pull Request
+You will be presented with movie list from your
+trakt.tv account. Select movie, quality, app for streaming
+and video player. Enjoy!
+
