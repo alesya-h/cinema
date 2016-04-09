@@ -55,7 +55,7 @@ module Cinema
     def torrents(imdb_id)
       with_unreliable_api do
         puts "Searching torrents..."
-        response = RestClient.get("http://yts.to/api/v2/list_movies.json?query_term=#{imdb_id}").body
+        response = RestClient.get("http://yts.ag/api/v2/list_movies.json?query_term=#{imdb_id}").body
         JSON.parse(response)["data"]["movies"].first["torrents"]
       end
     end
