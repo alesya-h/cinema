@@ -48,7 +48,7 @@ module Cinema
     def watchlist
       with_unreliable_api do
         puts "Requesting watchlist..."
-        trakt_request(:get, "calendars/my/movies/1900-01-01/1000000")
+        trakt_request(:get, "sync/watchlist/movies")
       end
     end
 
