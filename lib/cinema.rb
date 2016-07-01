@@ -13,17 +13,18 @@ module Cinema
 
     def ask_and_play
       imdb_id = select("Select movie",
-                       watchlist.sort_by{|x| x["released"]},
-                       ->(x){ x["movie"]["title"] })["movie"]["ids"]["imdb"]
+                       watchlist.sort_by{|x| x["released"]}){|x|
+        x["movie"]["title"]
+      }["movie"]["ids"]["imdb"]
       unless imdb_id
         print "imdb id: "
         imdb_id = gets.chomp
       end
-      torrent = select("Select quality", torrents(imdb_id), ->(x){ x["quality"] })["url"]
-      downloader = select("Select downloader", ["peerflix", "qbittorrent", "wget", "echo"], ->(x){x})
+      torrent = select("Select quality", torrents(imdb_id)){|x| x["quality"] }["url"]
+      downloader = select("Select downloader", ["peerflix", "qbittorrent", "wget", "echo"])
       case downloader
       when 'peerflix'
-        player = select("Select player", ["mplayer","vlc"], ->(x){x})
+        player = select("Select player", ["mplayer","vlc"])
         system downloader, torrent, "--#{player}"
       when 'qbittorrent'
         system "sh", "-c", "#{downloader} #{torrent} &"
@@ -32,8 +33,10 @@ module Cinema
       end
     end
 
-    def select(title, items, title_proc)
-      menu_items = items.each_with_index.map{|x,i| [i.to_s, title_proc.(x)]}
+    def select(title, items, &title_proc)
+      menu_items = items.each_with_index.map do |x,i|
+        [i.to_s, (title_proc ? title_proc.(x) : x)]
+      end
       index = capture_stderr do
         success = system 'dialog', '--title', title,
           '--menu', '', '0', '0', '0',
