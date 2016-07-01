@@ -39,7 +39,7 @@ module Cinema
           '--menu', '', '0', '0', '0',
           *menu_items.flatten
         unless success
-          return nil
+          exit 0
         end
       end
       items[index.to_i] if index
