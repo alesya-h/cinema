@@ -11,17 +11,20 @@ module Cinema
     APP_ID="69f18bbaff859f035d934888f846b7ae3653e223a2b0f15629bcc9b836d3996b"
     APP_SECRET="077edf5024fca4102295263e802631f52f8cebd404f612194279f059bc5d9b8d"
 
-    def ask_and_play
-      imdb_id = select("Select movie",
-                       watchlist.sort_by{|x| x["released"]}){|x|
-        x["movie"]["title"]
-      }["movie"]["ids"]["imdb"]
-      unless imdb_id
-        print "imdb id: "
-        imdb_id = gets.chomp
+    def get_sorting_options(sample)
+      sample.reduce([]) do |result, (k,v)|
+        if v.is_a? Hash
+          child_sorting_options = get_sorting_options(v).map do |name, accessor|
+            ["#{k} #{name}", ->(x){ accessor.(x[k]) }]
+          end
+          result.concat child_sorting_options
+        else
+          result << [k.to_s, ->(x){ x[k] }]
+        end
       end
-      torrent = select("Select quality", torrents(imdb_id)){|x| x["quality"] }["url"]
-      downloader = select("Select downloader", ["peerflix", "qbittorrent", "wget", "echo"])
+    end
+
+    def run_torrent(downloader, torrent)
       case downloader
       when 'peerflix'
         player = select("Select player", ["mplayer","vlc"])
@@ -31,6 +34,20 @@ module Cinema
       else
         system downloader, torrent
       end
+    end
+
+    def ask_and_play
+      watchlist = get_watchlist
+      sorting_options = get_sorting_options(watchlist.first)
+      sort_getter = select("Order movie list by", sorting_options, &:first).last
+
+      imdb_id = select("Select movie", watchlist.sort_by{|x| sort_getter.(x)}){ |x|
+        "#{sort_getter.(x)}: #{x["movie"]["title"]}"
+      }["movie"]["ids"]["imdb"]
+
+      torrent = select("Select quality", torrents(imdb_id)){|x| x["quality"] }["url"]
+      downloader = select("Select downloader", ["peerflix", "qbittorrent", "wget", "echo"])
+      run_torrent(downloader, torrent)
     end
 
     def select(title, items, &title_proc)
@@ -48,7 +65,7 @@ module Cinema
       items[index.to_i] if index
     end
 
-    def watchlist
+    def get_watchlist
       with_unreliable_api do
         puts "Requesting watchlist..."
         trakt_request(:get, "sync/watchlist/movies")
